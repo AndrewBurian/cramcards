@@ -1,0 +1,264 @@
+#!/usr/bin/ruby
+
+# Quesetion object
+class Question
+	@question
+	@answer
+	
+	@checktype
+	
+	# Set up the question and it's check type
+	def initialize(q, a, type)
+		@question = q
+		@answer = a
+		@checktype = type
+
+		case @checktype
+			when "match", "Match", "ask"
+				# no need to do anything
+			when "regex"
+				@answer = /#{@answer}/i
+			when "Regex"
+				@answer = /#{@answer}/
+			else
+				# default to ask
+				@checktype = "ask"
+		end
+	end
+	
+	def q
+		@question
+	end
+	def a
+		case @checktype
+			when "regex", "Regex"
+				return "matches #{@answer.inspect}"
+			else
+				return @answer
+		end
+	end
+
+	# Take a response and check for correctness
+	def check(answer)
+		case @checktype
+			when "Match"
+				return answer == @answer
+			when "match"
+				if @answer.casecmp(answer) == 0 then
+					return true
+				else
+					return false
+				end
+			when "regex", "Regex"
+				return answer =~ @answer
+			when "ask"
+				puts "Correct answer was: #{@answer}"
+				print "Were you correct? [y/N] "
+				resp = gets.chomp
+				return resp.length > 0 && resp  =~ /y.*/i
+		end
+	end
+end
+
+
+
+# Session object
+class Session
+
+	require 'yaml'
+		
+	# the deck of cards
+	@deck
+	
+	# the cram levels
+	@levels
+
+	# state variables
+	@cur_level
+
+	def good_msg(msg)
+		puts "\e[32;1m[+]\e[m #{msg}"
+	end
+	def info_msg(msg)
+		puts "\e[34;1m[*]\e[m #{msg}"
+	end
+	def bad_msg(msg)
+		puts "\e[31;1m[-]\e[m #{msg}"
+	end
+	def debug(msg)
+		#puts "\e[33;1m[?]\e[m #{msg}"
+	end
+
+	def initialize(deckfile, cramlevels)
+
+		
+		# Initialize the deck from a YAML file
+		begin
+			@deck = YAML::load(File.new(deckfile))
+		rescue => err
+			raise "Invalid deck: #{deckfile}"
+		end
+		
+		# Sanity checks for the deck
+		raise "Invalid deck: #{deckfile}" if !@deck.is_a?(Array)
+		@deck.each do |card|
+			@deck.delete(card) if !card.is_a?(Question)
+		end
+		
+		info_msg "Deck loaded with #{@deck.length} cards"
+		raise "Empty deck: #{deckfile}" if @deck.length == 0
+		
+		# Initialize the levels as empty arrays
+		@levels = Array.new
+		@levels.push(Array.new) # for level 0
+		cramlevels.times do
+			@levels.push(Array.new) # for all cram levels
+			debug "Added level"
+		end
+		debug "Total levels: #{@levels.count}"
+
+		# fill level 0 with all the card references
+		(0..(@deck.length - 1)).each { |n| @levels[0].push(n) }
+		
+		@cur_level = -1
+	end
+
+	def next
+		# check to see if this level is empty
+		if @cur_level == -1 || @levels[@cur_level].count == 0 then
+			system "clear" or system "cls" if @cur_level != -1
+			good_msg "Completed level #{@cur_level}" if @cur_level != -1
+			@cur_level = -1
+			
+			# find the lowest level with cards
+			(0..(@levels.length - 1)).each do |n|
+				debug "Searching level #{n}"
+				debug "Contains #{@levels[n].length}"
+				if @levels[n].length > 0 then
+					@cur_level = n
+					info_msg "Starting level #{n}/#{@levels.count - 1} with #{@levels[n].length} cards"
+					break
+				end
+			end
+
+			# Check all cards done
+			if @cur_level == -1 then
+				good_msg "All cards completed!"
+				return false
+			end
+		end
+		
+		# if this is the last level, cards are returned to the deck
+		# otherwise they go to the next level		
+		if @cur_level == @levels.length - 1
+			next_level = -1
+		else
+			next_level = @cur_level + 1
+		end
+
+		card = @levels[@cur_level].first
+		print "#{@deck[card].q}: "
+		if @deck[card].check(gets.chomp)
+			good_msg "Correct!"
+			# pop the card
+			@levels[@cur_level].shift
+			@levels[next_level].push(card) if next_level != -1
+		else
+			bad_msg "Correct answer was #{@deck[card].a}"
+			@levels[0].push(@levels[@cur_level].shift)
+		end
+		
+		#continue
+		true
+	end
+
+	# For session restoring
+	def save
+		info_msg "Saving session as cram.restore"
+		file = File.new('cram.restore', 'w')
+		file.print(Marshal::dump(self))
+		file.close
+	end
+end
+
+
+
+
+
+#########################################################
+
+require 'getoptlong'
+
+opts = GetoptLong.new(
+	[ '--help',	'-h',	GetoptLong::NO_ARGUMENT ],
+	[ '--restore',	'-r',	GetoptLong::NO_ARGUMENT ],
+	[ '--levels',	'-l', 	GetoptLong::REQUIRED_ARGUMENT ],
+)
+
+file = nil
+levels = nil
+restore = false
+
+opts.each do |opt, arg|
+	case opt
+		when '--levels'
+			levels = arg.to_i
+		when '--restore'
+			restore = true
+		when '--help'
+			puts "#{$PROGRAM_NAME} [--levels <n>] [--restore] <file>"
+			exit
+	end
+end
+
+if restore && levels 
+	puts "Restore cannot be used in conjunction with other arguments"
+	exit
+end
+
+levels = nil if levels && levels < 1
+levels ||= 5
+
+if ARGV.length != 1
+	puts "File required"
+	exit
+end
+
+file = ARGV.shift
+
+# load a new deck
+if !restore
+	begin
+		ses = Session.new(file, levels)
+	rescue => err
+		puts err
+		exit
+	end
+end
+
+# restore an old session
+if restore
+	begin
+		restorefile = File.new(file)
+		ses = Marshal::restore(restorefile)
+		restorefile.close
+		File.delete(file)
+		
+	rescue => err
+		puts "Invalid session restore file"
+		puts err
+		exit
+	end
+end
+
+
+# Trap an inturrupt
+Signal.trap("INT") do
+	puts " Inurrupt!"
+	ses.save
+	exit
+end
+
+while(ses.next) do
+	# run the game
+end
