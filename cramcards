@@ -14,12 +14,8 @@ class Question
 		@checktype = type
 
 		case @checktype
-			when "match", "Match", "ask"
+			when "match", "Match", "ask", "regex", "Regex"
 				# no need to do anything
-			when "regex"
-				@answer = /#{@answer}/i
-			when "Regex"
-				@answer = /#{@answer}/
 			else
 				# default to ask
 				@checktype = "ask"
@@ -49,8 +45,10 @@ class Question
 				else
 					return false
 				end
-			when "regex", "Regex"
-				return answer =~ @answer
+			when "regex"
+				return answer =~ /#{@answer}/i
+			when "Regex"
+				return answer =~ /#{@answer}/
 			when "ask"
 				puts "Correct answer was: #{@answer}"
 				print "Were you correct? [y/N] "
