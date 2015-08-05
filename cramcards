@@ -124,8 +124,13 @@ class Session
 	def next
 		# check to see if this level is empty
 		if @cur_level == -1 || @levels[@cur_level].count == 0 then
-			system "clear" or system "cls" if @cur_level != -1
-			good_msg "Completed level #{@cur_level}" if @cur_level != -1
+			
+			if @cur_level != -1
+				good_msg "Completed level #{@cur_level}"
+				sleep(2)
+				system "clear" or system "cls"
+			end
+	
 			@cur_level = -1
 			
 			# find the lowest level with cards
