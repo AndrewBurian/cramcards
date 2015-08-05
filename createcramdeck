@@ -1,0 +1,86 @@
+#!/usr/bin/ruby
+
+require "yaml"
+
+class Question
+	@question
+	@answer
+	@checktype
+	def initialize(q,a,t)
+		@question = q
+		@answer = a
+		@checktype = t
+	end
+end
+
+if ARGV.count != 1
+	puts "Usage: #{$PROGRAM_NAME} <deckfile>"
+	exit
+end
+
+filepath = ARGV[0]
+deckfile = nil
+deck = nil
+default_check = nil
+
+if File.exists?(filepath) && File.size(filepath) > 0
+
+	deckfile = File.new(filepath)
+	deck = YAML::load(deckfile)
+	deckfile.close
+
+	if !deck.is_a?(Array)
+		puts "#{filepath} exists and is not a valid deck file"
+		exit
+	end
+
+	deck.each do |card|
+		if !card.is_a?(Question)
+			puts "#{filepath} deck contains invalid objects"
+			exit
+		end
+	end
+	puts "Appending to existing deck"
+else
+	deck = Array.new
+	puts "Creating new deck"
+end
+
+print """Enter the default checktype:
+  ask   - will prompt y/n for each question
+  match - will match the answer given to the card (case insensitive)
+  Match - Case sensitive match
+  regex - Match regular expression (case insensitive)
+  Regex - Case sensitive regex
+> """
+
+default_check = $stdin.gets.chomp
+
+Signal.trap("INT") do
+	puts " Inturrupt"
+	puts "Writing deck to file"
+	deckfile = File.new(filepath, 'w')
+	deckfile.print(YAML::dump(deck))
+	deckfile.close
+	exit
+end
+
+puts "Ctrl+c to finish" 
+
+loop do
+	print "Question: "
+	q = $stdin.gets.chomp
+	print "Answer: "
+	a = $stdin.gets.chomp
+	print "Check type [#{default_check}]: "
+	t = $stdin.gets.chomp
+	t = default_check if t.length == 0
+
+	if q.length == 0 or a.length == 0
+		puts "Cannot have 0 length q or a"
+		next
+	end
+
+	deck.push(Question.new(q,a,t))
+	puts "Question added\n"
+end
