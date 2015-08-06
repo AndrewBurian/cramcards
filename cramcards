@@ -181,6 +181,11 @@ class Session
 
 	# For session restoring
 	def save
+		if File.exists?('cram.restore')
+			bad_msg "cram.restore already exists. Saving will overwrite this file!"
+		end
+		print "Save restore file? [Y/n] "
+		return if gets.chomp =~ /n.*/i
 		info_msg "Saving session as cram.restore"
 		file = File.new('cram.restore', 'w')
 		file.print(Marshal::dump(self))
