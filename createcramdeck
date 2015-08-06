@@ -56,22 +56,16 @@ print """Enter the default checktype:
 
 default_check = $stdin.gets.chomp
 
-Signal.trap("INT") do
-	puts " Inturrupt"
-	puts "Writing deck to file"
-	deckfile = File.new(filepath, 'w')
-	deckfile.print(YAML::dump(deck))
-	deckfile.close
-	exit
-end
-
-puts "Ctrl+c to finish" 
+puts "Type 'done' to finish" 
 
 loop do
 	print "Question: "
 	q = $stdin.gets.chomp
+	break if q =~ /done/i
+	
 	print "Answer: "
 	a = $stdin.gets.chomp
+	
 	print "Check type [#{default_check}]: "
 	t = $stdin.gets.chomp
 	t = default_check if t.length == 0
@@ -84,3 +78,8 @@ loop do
 	deck.push(Question.new(q,a,t))
 	puts "Question added\n"
 end
+
+puts "Writing deck to file"
+deckfile = File.new(filepath, 'w')
+deckfile.print(YAML::dump(deck))
+deckfile.close
