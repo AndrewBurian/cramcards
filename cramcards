@@ -117,7 +117,10 @@ class Session
 
 		# fill level 0 with all the card references
 		(0..(@deck.length - 1)).each { |n| @levels[0].push(n) }
-		
+	
+		# shuffle deck
+		@levels[0].shuffle!
+	
 		@cur_level = -1
 	end
 
@@ -140,6 +143,7 @@ class Session
 				if @levels[n].length > 0 then
 					@cur_level = n
 					info_msg "Starting level #{n}/#{@levels.count - 1} with #{@levels[n].length} cards"
+					@levels[@cur_level].shuffle!
 					break
 				end
 			end
